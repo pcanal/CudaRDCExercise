@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18...3.22)
 project(cuda-rdc-test C CXX CUDA)
 
+set(CMAKE_CXX_STANDARD 14)
 include(CTest)
 include(CudaRdcUtils.cmake)
 
@@ -17,10 +18,10 @@ add_test(NAME test_shar_foo_CPP_Consumer COMMAND shar_foo_CPP_Consumer)
 
 # 1d. Consume "shar_foo" in a mixed C++/Cuda exe
 add_executable(shar_foo_CUDA_Consumer fooConsumer.cc dummy.cu)
+set_target_properties(shar_foo_CUDA_Consumer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 cuda_rdc_target_link_libraries(shar_foo_CUDA_Consumer PRIVATE shar_foo)
-# By default, CMake links an executable to the static CUDA runtime
-# This seems to cause issues for CudaRDCUtils in this use case
-#set_target_properties(shar_foo_CUDA_Consumer PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+# As implemented, the consuming executable *must* use the Shared CUDA runtime because shar_foo does
+set_target_properties(shar_foo_CUDA_Consumer PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
 add_test(NAME test_shar_foo_CUDA_Consumer COMMAND shar_foo_CUDA_Consumer)
 
 # 1e. Consume "stat_foo" in a pure C++ exe
