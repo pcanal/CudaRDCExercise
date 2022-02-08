@@ -7,3 +7,6 @@ include(CudaRdcUtils.cmake)
 
 # Simplest test case
 add_subdirectory(simple_test)
+
+# ATLAS/CMS test case
+add_subdirectory(atlas_test)

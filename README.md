@@ -12,7 +12,11 @@ $ cmake --build build
 $ cmake --build build --target test
 ```
 
-All tests except `Test #2: test_shar_foo_CUDA_Consumer` should pass. The failing
+## `simple_test`
+
+A very simple demo of `CudaRdcUtils` and comparison with reproducing it in native CMake
+
+All tests except `test_shar_foo_CUDA_Consumer` should pass. The failing
 test simply tries to call the `foo()` function, which in turn calls the `fooKernel`
 kernel. The failure message is "invalid device function", but all device linking appears
 to have been done correctly. The only difference between Test 2 and Test 1 is that 
@@ -26,3 +30,7 @@ library. By default, CMake links a CUDA-using executable using the static runtim
 but the device link file and the final exe use the static runtime. This seems to be the cause of
 the error. Setting `shar_foo_CUDA_Consumer`'s `CUDA_RUNTIME_LIBRARY` target property to `Shared`
 results in a running executable.
+
+# atlas_test
+
+A test case of CudaRdcUtils with an example linking problem from ATLAS (with input from CMS)
