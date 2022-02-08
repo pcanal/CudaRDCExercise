@@ -87,3 +87,7 @@ the pure CPP case, we link to the `_final` device-linked shared libraries and al
 
 This suggests either a mis-use of the RDC functions, or a bug in how they resolve what to include in device links.
 
+See also the [`build_cmssw.sh` script](atlas_test/build_cmssw.sh) which outlines CMSSW's method for handling CUDA
+libraries (originally posted [here](https://github.com/krasznaa/CUDALinkTest/issues/1)). This is very similar to
+the RDC pattern, the `_nv` libraries taking the place of the RDC `_static` ones in the process. Whilst the `_nv` libs
+are stripped down to only device/CUDA symbols, this shouldn't make too much difference when device linking.
