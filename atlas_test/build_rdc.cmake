@@ -26,7 +26,6 @@ cuda_rdc_target_link_libraries(testRDCLinkCPP PRIVATE RDCMultiplyLib RDCHelperLi
 
 # CPP+CUDA consumer
 add_executable(testRDCLinkCUDA main.cxx dummy.cu)
-set_target_properties(testRDCLinkCUDA PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
 cuda_rdc_target_link_libraries(testRDCLinkCUDA PRIVATE RDCMultiplyLib RDCHelperLib)
 
 if(BUILD_TESTING)
