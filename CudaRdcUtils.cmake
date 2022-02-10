@@ -195,6 +195,20 @@ function(cuda_rdc_generate_empty_cu_file emptyfilenamevar target)
 endfunction()
 
 #
+# Transfer the setting \${what} (both the PUBLIC and INTERFACE version) to from library \${fromlib} to the library \${tolib} that depends on it
+
+function(cuda_rdc_transfer_setting fromlib tolib what)
+  get_target_property(_temp ${fromlib} ${what})
+  if (_temp)
+    cmake_language(CALL target_${what} ${tolib} PUBLIC ${_temp})
+  endif()
+  get_target_property(_temp ${fromlib} INTERFACE_${what})
+  if (_temp)
+    cmake_language(CALL target_${what} ${tolib} PUBLIC ${_temp})
+  endif()
+endfunction()
+
+#
 # cuda_rdc_add_library
 #
 # Add a library taking into account whether it contains
@@ -535,7 +549,7 @@ function(cuda_rdc_target_link_libraries target)
       endif()
     endif()
 
-    # Set now to let taraget_link_libraries do the argument parsing
+    # Set now to let target_link_libraries do the argument parsing
     target_link_libraries(${_target_middle} ${ARGN})
 
     cuda_rdc_use_middle_lib_in_property(${_target_middle} INTERFACE_LINK_LIBRARIES)
@@ -588,17 +602,44 @@ function(cuda_rdc_target_link_libraries target)
     endif()
 
     if(_contains_cuda)
+      get_target_property(_current_runtime_setting ${target} CUDA_RUNTIME_LIBRARY)
+      if(_current_runtime_setting)
+         set(_target_runtime_setting ${_current_runtime_setting})
+      endif()
       cuda_rdc_cuda_gather_dependencies(_flat_target_link_libraries ${_target_middle})
       foreach(_lib ${_flat_target_link_libraries})
         get_target_property(_lib_target_type ${_lib} TYPE)
         if(NOT "x${_lib_target_type}" STREQUAL "xINTERFACE_LIBRARY")
+          get_target_property(_lib_runtime_setting ${_lib} CUDA_RUNTIME_LIBRARY)
+          if(NOT _target_runtime_setting)
+            if(_lib_runtime_setting)
+              set(_target_runtime_setting ${_lib_runtime_setting})
+            endif()
+          else()
+            if(_lib_runtime_setting AND NOT (_target_runtime_setting STREQUAL _lib_runtime_setting))
+              if (_current_runtime_setting AND NOT (_current_runtime_setting STREQUAL _lib_runtime_setting))
+                message(FATAL_ERROR "The CUDA runtime used for ${_lib} [${_lib_runtime_setting}] is different from the one used by ${target} [${_current_runtime_setting}]")
+              else()
+                message(FATAL_ERROR "The CUDA runtime used for ${_lib} [${_lib_runtime_setting}] is different from the one used by of the other dependency of ${target} [${_lib_runtime_setting}]")
+              endif()
+            endif()
+          endif()
+          if (NOT _current_runtime_setting)
+             set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY ${_target_runtime_setting})
+          endif()
           get_target_property(_libstatic ${_lib} CUDA_RDC_STATIC_LIBRARY)
           if(TARGET ${_libstatic})
             target_link_options(${_target_final}
               PRIVATE
               $<DEVICE_LINK:$<TARGET_FILE:${_libstatic}>>
             )
-          add_dependencies(${_target_final} ${_libstatic})
+
+            # Also pass on the the options and definitions.
+            cuda_rdc_transfer_setting(${_libstatic} ${_target_final} COMPILE_OPTIONS)
+            cuda_rdc_transfer_setting(${_libstatic} ${_target_final} COMPILE_DEFINITIONS)
+            cuda_rdc_transfer_setting(${_libstatic} ${_target_final} LINK_OPTIONS)
+
+            add_dependencies(${_target_final} ${_libstatic})
           endif()
         endif()
       endforeach()

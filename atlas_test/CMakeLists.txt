@@ -1,6 +1,6 @@
 
 # Set up the project.
-cmake_minimum_required( VERSION 3.12 )
+cmake_minimum_required(VERSION 3.18...3.22)
 project( CUDALinkTest VERSION 1.0.0 LANGUAGES CXX CUDA )
 
 # Use C++14.
