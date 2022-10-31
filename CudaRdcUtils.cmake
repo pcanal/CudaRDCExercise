@@ -89,6 +89,10 @@ relocatable device code.
   
 #]=======================================================================]
 
+include_guard(GLOBAL)
+
+#-----------------------------------------------------------------------------#
+
 define_property(TARGET PROPERTY CUDA_RDC_LIBRARY_TYPE
   BRIEF_DOCS "Indicate the type of cuda library (STATIC and SHARED for nvlink usage, FINAL for linking into not cuda library/executable"
   FULL_DOCS "Indicate the type of cuda library (STATIC and SHARED for nvlink usage, FINAL for linking into not cuda library/executable"
