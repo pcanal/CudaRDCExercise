@@ -86,7 +86,21 @@ relocatable device code.
   to ``install``.
   
   See ``install`` for additional detail.
+
+.. command:: cuda_rdc_target_compile_options
+
+   Specify compile options for a CUDA RDC target
+
+     ::
+       cuda_rdc_target_compile_options(<target> [BEFORE]
+         <INTERFACE|PUBLIC|PRIVATE> [items1...]
+         [<INTERFACE|PUBLIC|PRIVATE> [items2...] ...])
+
+  In the case that an input target does not contain CUDA code, the command decays
+  to ``target_compile_options``.
   
+  See ``target_compile_options`` for additional detail.
+
 #]=======================================================================]
 
 include_guard(GLOBAL)
@@ -375,6 +389,36 @@ function(cuda_rdc_target_include_directories target)
     endif()
   endif()
 
+endfunction()
+
+#-----------------------------------------------------------------------------#
+# Replacement for target_compile_options that is aware of
+# the 4 libraries (objects, static, middle, final) libraries needed
+# for a separatable CUDA library
+function(cuda_rdc_target_compile_options target)
+  if(NOT CELERITAS_USE_CUDA)
+    target_compile_options(${ARGV})
+  else()
+
+    cuda_rdc_strip_alias(target ${target})
+    cuda_rdc_lib_contains_cuda(_contains_cuda ${target})
+
+    if (_contains_cuda)
+      get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
+      if(_targettype)
+        get_target_property(_target_middle ${target} CUDA_RDC_MIDDLE_LIBRARY)
+        get_target_property(_target_object ${target} CUDA_RDC_OBJECT_LIBRARY)
+      endif()
+    endif()
+    if(_target_object)
+      target_compile_options(${_target_object} ${ARGN})
+    endif()
+    if(_target_middle)
+      target_compile_options(${_target_middle} ${ARGN})
+    else()
+      target_compile_options(${ARGV})
+    endif()
+  endif()
 endfunction()
 
 #
