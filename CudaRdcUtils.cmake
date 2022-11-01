@@ -650,8 +650,6 @@ function(cuda_rdc_target_link_libraries target)
 
     get_target_property(_target_type ${target} TYPE)
     if("x${_target_type}" STREQUAL "xEXECUTABLE")
-      cuda_rdc_cuda_gather_dependencies(_alldependencies ${target})
-      cuda_rdc_find_final_library(_finallibs "${_alldependencies}")
       list(LENGTH _finallibs _final_count)
       if(_contains_cuda)
         if(${_final_count} GREATER 0)
