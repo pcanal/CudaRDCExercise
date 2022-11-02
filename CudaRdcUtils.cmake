@@ -579,7 +579,9 @@ function(cuda_rdc_find_final_library OUTLIST flat_dependency_list)
   set(${OUTLIST} ${_final_result} PARENT_SCOPE)
 endfunction()
 
-#  Check which CUDA runtime is need for a give (depend) library.
+#-----------------------------------------------------------------------------#
+#
+#  Check which CUDA runtime is needed for a given (dependent) library.
 function(cuda_rdc_check_cuda_runtime OUTVAR library)
 
   get_target_property(_runtime_setting ${library} CUDA_RUNTIME_LIBRARY)
