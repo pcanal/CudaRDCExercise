@@ -40,7 +40,7 @@ relocatable device code.
 
   Specify libraries or flags to use when linking a given target and/or its dependents, taking
   in account the extra targets (see cuda_rdc_add_library) needed to support CUDA relocatable
-  device code. 
+  device code.
 
     ::
 
@@ -56,7 +56,7 @@ relocatable device code.
 
 
 .. command:: cuda_rdc_target_include_directories
-  
+
   Add include directories to a target.
 
     ::
@@ -65,9 +65,9 @@ relocatable device code.
         <INTERFACE|PUBLIC|PRIVATE> [items1...]
         [<INTERFACE|PUBLIC|PRIVATE> [items2...] ...])
 
-  Specifies include directories to use when compiling a given target. The named <target> 
+  Specifies include directories to use when compiling a given target. The named <target>
   must have been created by a command such as cuda_rdc_add_library(), add_executable() or add_library(),
-  and can be used with an ALIAS target. It is aware of the 4 underlying targets (objects, static, 
+  and can be used with an ALIAS target. It is aware of the 4 underlying targets (objects, static,
   middle, final) present when the input target was created cuda_rdc_add_library() and will propagate
   the include directories to all four. In the case that ``<target>`` does not contain CUDA code,
   the command decays to ``target_include_directories``.
@@ -84,7 +84,7 @@ relocatable device code.
 
   In the case that an input target does not contain CUDA code, the command decays
   to ``install``.
-  
+
   See ``install`` for additional detail.
 
 .. command:: cuda_rdc_target_compile_options
@@ -98,7 +98,7 @@ relocatable device code.
 
   In the case that an input target does not contain CUDA code, the command decays
   to ``target_compile_options``.
-  
+
   See ``target_compile_options`` for additional detail.
 
 #]=======================================================================]
