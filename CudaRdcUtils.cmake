@@ -270,8 +270,13 @@ function(cuda_rdc_add_library target)
     set(_cudaruntime_requested_type "Static")
     set(_staticsuf "")
   endif()
-  if(_ADDLIB_PARSE_MODULE)
-    message(FATAL_ERROR "cuda_rdc_add_library does not support MODULE library containing device code")
+  if (_ADDLIB_PARSE_MODULE)
+    add_library(${target} ${ARGN})
+    set_target_properties(${target} PROPERTIES
+      CUDA_SEPARABLE_COMPILATION ON
+      CUDA_RUNTIME_LIBRARY ${_cudaruntime_requested_type}
+    )
+    return()
   endif()
   if(_ADDLIB_PARSE_OBJECT)
     message(FATAL_ERROR "cuda_rdc_add_library does not support OBJECT library")
