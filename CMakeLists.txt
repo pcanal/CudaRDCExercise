@@ -8,5 +8,8 @@ include(CudaRdcUtils.cmake)
 # Simplest test case
 add_subdirectory(simple_test)
 
+# Simplest module test case
+add_subdirectory(module_test)
+
 # ATLAS/CMS test case
 add_subdirectory(atlas_test)
