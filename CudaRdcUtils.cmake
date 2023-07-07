@@ -360,28 +360,27 @@ endfunction()
 function(cuda_rdc_target_include_directories target)
   if(NOT CMAKE_CUDA_COMPILER)
     target_include_directories(${ARGV})
-  else()
-
-    cuda_rdc_strip_alias(target ${target})
-    cuda_rdc_lib_contains_cuda(_contains_cuda ${target})
-
-    if (_contains_cuda)
-      get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
-      if(_targettype)
-        get_target_property(_target_middle ${target} CUDA_RDC_MIDDLE_LIBRARY)
-        get_target_property(_target_object ${target} CUDA_RDC_OBJECT_LIBRARY)
-      endif()
-    endif()
-    if(_target_object)
-      target_include_directories(${_target_object} ${ARGN})
-    endif()
-    if(_target_middle)
-      target_include_directories(${_target_middle} ${ARGN})
-    else()
-      target_include_directories(${ARGV})
-    endif()
+    return()
   endif()
 
+  cuda_rdc_strip_alias(target ${target})
+  cuda_rdc_lib_contains_cuda(_contains_cuda ${target})
+
+  if(_contains_cuda)
+    get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
+    if(_targettype)
+      get_target_property(_target_middle ${target} CUDA_RDC_MIDDLE_LIBRARY)
+      get_target_property(_target_object ${target} CUDA_RDC_OBJECT_LIBRARY)
+    endif()
+  endif()
+  if(_target_object)
+    target_include_directories(${_target_object} ${ARGN})
+  endif()
+  if(_target_middle)
+    target_include_directories(${_target_middle} ${ARGN})
+  else()
+    target_include_directories(${ARGV})
+  endif()
 endfunction()
 
 #-----------------------------------------------------------------------------#
@@ -620,143 +619,51 @@ endfunction()
 function(cuda_rdc_target_link_libraries target)
   if(NOT CMAKE_CUDA_COMPILER)
     target_link_libraries(${ARGV})
-  else()
-    cuda_rdc_strip_alias(target ${target})
+    return()
+  endif()
 
-    cuda_rdc_lib_contains_cuda(_contains_cuda ${target})
+  cuda_rdc_strip_alias(target ${target})
 
-    set(_target_final ${target})
-    set(_target_middle ${target})
-    if (_contains_cuda)
-      get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
-      if(_targettype)
-        get_target_property(_target_final ${target} CUDA_RDC_FINAL_LIBRARY)
-        get_target_property(_target_middle ${target} CUDA_RDC_MIDDLE_LIBRARY)
-        get_target_property(_target_object ${target} CUDA_RDC_OBJECT_LIBRARY)
-      endif()
+  cuda_rdc_lib_contains_cuda(_contains_cuda ${target})
+
+  set(_target_final ${target})
+  set(_target_middle ${target})
+  if(_contains_cuda)
+    get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
+    if(_targettype)
+      get_target_property(_target_final ${target} CUDA_RDC_FINAL_LIBRARY)
+      get_target_property(_target_middle ${target} CUDA_RDC_MIDDLE_LIBRARY)
+      get_target_property(_target_object ${target} CUDA_RDC_OBJECT_LIBRARY)
     endif()
+  endif()
 
-    # Set now to let target_link_libraries do the argument parsing
-    target_link_libraries(${_target_middle} ${ARGN})
+  # Set now to let target_link_libraries do the argument parsing
+  target_link_libraries(${_target_middle} ${ARGN})
 
-    cuda_rdc_use_middle_lib_in_property(${_target_middle} INTERFACE_LINK_LIBRARIES)
-    cuda_rdc_use_middle_lib_in_property(${_target_middle} LINK_LIBRARIES)
+  cuda_rdc_use_middle_lib_in_property(${_target_middle} INTERFACE_LINK_LIBRARIES)
+  cuda_rdc_use_middle_lib_in_property(${_target_middle} LINK_LIBRARIES)
 
-    if(_target_object)
-      target_link_libraries(${_target_object} ${ARGN})
-      cuda_rdc_use_middle_lib_in_property(${_target_object} INTERFACE_LINK_LIBRARIES)
-      cuda_rdc_use_middle_lib_in_property(${_target_object} LINK_LIBRARIES)
-    endif()
+  if(_target_object)
+    target_link_libraries(${_target_object} ${ARGN})
+    cuda_rdc_use_middle_lib_in_property(${_target_object} INTERFACE_LINK_LIBRARIES)
+    cuda_rdc_use_middle_lib_in_property(${_target_object} LINK_LIBRARIES)
+  endif()
 
-    cuda_rdc_cuda_gather_dependencies(_alldependencies ${target})
-    cuda_rdc_find_final_library(_finallibs "${_alldependencies}")
+  cuda_rdc_cuda_gather_dependencies(_alldependencies ${target})
+  cuda_rdc_find_final_library(_finallibs "${_alldependencies}")
 
-    get_target_property(_target_type ${target} TYPE)
-    if("x${_target_type}" STREQUAL "xEXECUTABLE")
-      list(LENGTH _finallibs _final_count)
-      if(_contains_cuda)
-        if(${_final_count} GREATER 0)
-          # If there is at least one final library this means that we
-          # have somewhere some "separable" nvcc compilations
-          set_target_properties(${target} PROPERTIES
-            CUDA_SEPARABLE_COMPILATION ON
-          )
-        endif()
-      elseif(${_final_count} EQUAL 1)
-        set_target_properties(${target} PROPERTIES
-          # If cmake detects that a library depends/uses a static library
-          # linked with CUDA, it will turn CUDA_RESOLVE_DEVICE_SYMBOLS ON
-          # leading to a call to nvlink.  If we let this through (at least
-          # in case of Celeritas) we would need to add the DEVICE_LINK options
-          # also on non cuda libraries (that we detect depends on a cuda library).
-          # Note: we might be able to move this to cuda_rdc_target_link_libraries
-          CUDA_RESOLVE_DEVICE_SYMBOLS OFF
-        )
-        get_target_property(_final_target_type ${target} TYPE)
-
-        get_target_property(_final_runtime ${_finallibs} CUDA_RUNTIME_LIBRARY)
-        if ("${_final_runtime}" STREQUAL "Shared")
-          set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
-        endif()
-
-        if("x${_final_target_type}" STREQUAL "xSTATIC_LIBRARY")
-          # for static libraries we need to list the libraries a second time (to resolve symbol from the final library)
-          get_target_property(_current_link_libraries ${target} LINK_LIBRARIES)
-          set_property(TARGET ${target} PROPERTY LINK_LIBRARIES ${_current_link_libraries} ${_finallibs} ${_current_link_libraries} )
-        else()
-          # We could have used:
-          #    target_link_libraries(${target} PUBLIC ${_finallibs})
-          # but target_link_libraries must used either all plain arguments or all plain
-          # keywords and at the moment I don't know how to detect which of the 2 style the
-          # user used.
-          # Maybe we could use:
-          #     if(ARGV1 MATCHES "^(PRIVATE|PUBLIC|INTERFACE)$")
-          # or simply keep the following:
-          get_target_property(_current_link_libraries ${target} LINK_LIBRARIES)
-          set_property(TARGET ${target} PROPERTY LINK_LIBRARIES ${_current_link_libraries} ${_finallibs} )
-        endif()
-      elseif(${_final_count} GREATER 1)
-        # turn into CUDA executable.
-        set(_contains_cuda TRUE)
-        cuda_rdc_generate_empty_cu_file(_emptyfilename ${target})
-        target_sources(${target} PRIVATE ${_emptyfilename})
-      endif()
-      # nothing to do if there is no final library (i.e. no use of CUDA at all?)
-    endif()
-
+  get_target_property(_target_type ${target} TYPE)
+  if("x${_target_type}" STREQUAL "xEXECUTABLE")
+    list(LENGTH _finallibs _final_count)
     if(_contains_cuda)
-      set(_need_to_use_shared_runtime FALSE)
-      get_target_property(_current_runtime_setting ${target} CUDA_RUNTIME_LIBRARY)
-      if(_current_runtime_setting)
-         set(_target_runtime_setting ${_current_runtime_setting})
+      if(${_final_count} GREATER 0)
+        # If there is at least one final library this means that we
+        # have somewhere some "separable" nvcc compilations
+        set_target_properties(${target} PROPERTIES
+          CUDA_SEPARABLE_COMPILATION ON
+        )
       endif()
-      cuda_rdc_cuda_gather_dependencies(_flat_target_link_libraries ${_target_middle})
-      foreach(_lib ${_flat_target_link_libraries})
-        get_target_property(_lib_target_type ${_lib} TYPE)
-        if(NOT "x${_lib_target_type}" STREQUAL "xINTERFACE_LIBRARY")
-          cuda_rdc_check_cuda_runtime(_lib_runtime_setting ${_lib})
-          if (NOT ${_need_to_use_shared_runtime} AND ${_lib_runtime_setting} STREQUAL "Shared")
-            set(_need_to_use_shared_runtime TRUE)
-          endif()
-          if(NOT _target_runtime_setting)
-            if(_lib_runtime_setting)
-              set(_target_runtime_setting ${_lib_runtime_setting})
-            endif()
-          else()
-            if(_lib_runtime_setting AND NOT (_target_runtime_setting STREQUAL _lib_runtime_setting))
-              # We need to match the dependent library since we can not change it.
-              set(_target_runtime_setting ${_lib_runtime_setting})
-            endif()
-          endif()
-          if (NOT _current_runtime_setting)
-            set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY ${_target_runtime_setting})
-          endif()
-          get_target_property(_libstatic ${_lib} CUDA_RDC_STATIC_LIBRARY)
-          if(TARGET ${_libstatic})
-            target_link_options(${_target_final}
-              PRIVATE
-              $<DEVICE_LINK:$<TARGET_FILE:${_libstatic}>>
-            )
-
-            # Also pass on the the options and definitions.
-            cuda_rdc_transfer_setting(${_libstatic} ${_target_final} COMPILE_OPTIONS)
-            cuda_rdc_transfer_setting(${_libstatic} ${_target_final} COMPILE_DEFINITIONS)
-            cuda_rdc_transfer_setting(${_libstatic} ${_target_final} LINK_OPTIONS)
-
-            add_dependencies(${_target_final} ${_libstatic})
-          endif()
-        endif()
-      endforeach()
-
-      if (_need_to_use_shared_runtime)
-        get_target_property(_current_runtime ${target} CUDA_RUNTIME_LIBRARY)
-        if (NOT "${_current_runtime}" STREQUAL "Shared")
-          set_target_properties(${_target_middle} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
-          set_target_properties(${_target_final} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
-          set_target_properties(${_target_object} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
-        endif()
-      endif()
-    else() # We could restrict to the case where the dependent is a static library ... maybe
+    elseif(${_final_count} EQUAL 1)
       set_target_properties(${target} PROPERTIES
         # If cmake detects that a library depends/uses a static library
         # linked with CUDA, it will turn CUDA_RESOLVE_DEVICE_SYMBOLS ON
@@ -766,22 +673,116 @@ function(cuda_rdc_target_link_libraries target)
         # Note: we might be able to move this to cuda_rdc_target_link_libraries
         CUDA_RESOLVE_DEVICE_SYMBOLS OFF
       )
-      if(NOT ${_target_type} STREQUAL "EXECUTABLE")
-        get_target_property(_current_runtime ${target} CUDA_RUNTIME_LIBRARY)
-        if(NOT "${_current_runtime}" STREQUAL "Shared")
-          set(_need_to_use_shared_runtime FALSE)
-          foreach(_lib ${_alldependencies})
-            cuda_rdc_check_cuda_runtime(_runtime ${_lib})
-            if (${_runtime} STREQUAL "Shared")
-              set(_need_to_use_shared_runtime TRUE)
-              break()
-            endif()
-          endforeach()
-          # We do not yet treat the case where the dependent library is Static
-          # and the current one is Shared.
-          if (${_need_to_use_shared_runtime})
-            set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
+      get_target_property(_final_target_type ${target} TYPE)
+
+      get_target_property(_final_runtime ${_finallibs} CUDA_RUNTIME_LIBRARY)
+      if("${_final_runtime}" STREQUAL "Shared")
+        set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
+      endif()
+
+      if("x${_final_target_type}" STREQUAL "xSTATIC_LIBRARY")
+        # for static libraries we need to list the libraries a second time (to resolve symbol from the final library)
+        get_target_property(_current_link_libraries ${target} LINK_LIBRARIES)
+        set_property(TARGET ${target} PROPERTY LINK_LIBRARIES ${_current_link_libraries} ${_finallibs} ${_current_link_libraries} )
+      else()
+        # We could have used:
+        #    target_link_libraries(${target} PUBLIC ${_finallibs})
+        # but target_link_libraries must used either all plain arguments or all plain
+        # keywords and at the moment I don't know how to detect which of the 2 style the
+        # user used.
+        # Maybe we could use:
+        #     if(ARGV1 MATCHES "^(PRIVATE|PUBLIC|INTERFACE)$")
+        # or simply keep the following:
+        get_target_property(_current_link_libraries ${target} LINK_LIBRARIES)
+        set_property(TARGET ${target} PROPERTY LINK_LIBRARIES ${_current_link_libraries} ${_finallibs} )
+      endif()
+    elseif(${_final_count} GREATER 1)
+      # turn into CUDA executable.
+      set(_contains_cuda TRUE)
+      cuda_rdc_generate_empty_cu_file(_emptyfilename ${target})
+      target_sources(${target} PRIVATE ${_emptyfilename})
+    endif()
+    # nothing to do if there is no final library (i.e. no use of CUDA at all?)
+  endif()
+
+  if(_contains_cuda)
+    set(_need_to_use_shared_runtime FALSE)
+    get_target_property(_current_runtime_setting ${target} CUDA_RUNTIME_LIBRARY)
+    if(_current_runtime_setting)
+       set(_target_runtime_setting ${_current_runtime_setting})
+    endif()
+    cuda_rdc_cuda_gather_dependencies(_flat_target_link_libraries ${_target_middle})
+    foreach(_lib ${_flat_target_link_libraries})
+      get_target_property(_lib_target_type ${_lib} TYPE)
+      if(NOT "x${_lib_target_type}" STREQUAL "xINTERFACE_LIBRARY")
+        cuda_rdc_check_cuda_runtime(_lib_runtime_setting ${_lib})
+        if (NOT ${_need_to_use_shared_runtime} AND ${_lib_runtime_setting} STREQUAL "Shared")
+          set(_need_to_use_shared_runtime TRUE)
+        endif()
+        if(NOT _target_runtime_setting)
+          if(_lib_runtime_setting)
+            set(_target_runtime_setting ${_lib_runtime_setting})
           endif()
+        else()
+          if(_lib_runtime_setting AND NOT (_target_runtime_setting STREQUAL _lib_runtime_setting))
+            # We need to match the dependent library since we can not change it.
+            set(_target_runtime_setting ${_lib_runtime_setting})
+          endif()
+        endif()
+        if (NOT _current_runtime_setting)
+          set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY ${_target_runtime_setting})
+        endif()
+        get_target_property(_libstatic ${_lib} CUDA_RDC_STATIC_LIBRARY)
+        if(TARGET ${_libstatic})
+          target_link_options(${_target_final}
+            PRIVATE
+            $<DEVICE_LINK:$<TARGET_FILE:${_libstatic}>>
+          )
+
+          # Also pass on the the options and definitions.
+          cuda_rdc_transfer_setting(${_libstatic} ${_target_final} COMPILE_OPTIONS)
+          cuda_rdc_transfer_setting(${_libstatic} ${_target_final} COMPILE_DEFINITIONS)
+          cuda_rdc_transfer_setting(${_libstatic} ${_target_final} LINK_OPTIONS)
+
+          add_dependencies(${_target_final} ${_libstatic})
+        endif()
+      endif()
+    endforeach()
+
+
+    if(_need_to_use_shared_runtime)
+      get_target_property(_current_runtime ${target} CUDA_RUNTIME_LIBRARY)
+      if(NOT "${_current_runtime}" STREQUAL "Shared")
+        set_target_properties(${_target_middle} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
+        set_target_properties(${_target_final} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
+        set_target_properties(${_target_object} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
+      endif()
+    endif()
+  else() # We could restrict to the case where the dependent is a static library ... maybe
+    set_target_properties(${target} PROPERTIES
+      # If cmake detects that a library depends/uses a static library
+      # linked with CUDA, it will turn CUDA_RESOLVE_DEVICE_SYMBOLS ON
+      # leading to a call to nvlink.  If we let this through (at least
+      # in case of Celeritas) we would need to add the DEVICE_LINK options
+      # also on non cuda libraries (that we detect depends on a cuda library).
+      # Note: we might be able to move this to cuda_rdc_target_link_libraries
+      CUDA_RESOLVE_DEVICE_SYMBOLS OFF
+    )
+    if(NOT ${_target_type} STREQUAL "EXECUTABLE")
+      get_target_property(_current_runtime ${target} CUDA_RUNTIME_LIBRARY)
+      if(NOT "${_current_runtime}" STREQUAL "Shared")
+        set(_need_to_use_shared_runtime FALSE)
+        foreach(_lib ${_alldependencies})
+          cuda_rdc_check_cuda_runtime(_runtime ${_lib})
+          if(${_runtime} STREQUAL "Shared")
+            set(_need_to_use_shared_runtime TRUE)
+            break()
+          endif()
+        endforeach()
+        # We do not yet treat the case where the dependent library is Static
+        # and the current one is Shared.
+        if(${_need_to_use_shared_runtime})
+          set_target_properties(${target} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
         endif()
       endif()
     endif()
@@ -789,35 +790,36 @@ function(cuda_rdc_target_link_libraries target)
 
 endfunction()
 
+#-----------------------------------------------------------------------------#
 #
 # Return a flat list of all the direct and indirect dependencies of 'target'
 # which are libraries containing CUDA separatable code.
 #
 function(cuda_rdc_cuda_gather_dependencies outlist target)
-  if(TARGET ${target})
-    cuda_rdc_strip_alias(target ${target})
-    get_target_property(_target_type ${target} TYPE)
-    if(NOT "x${_target_type}" STREQUAL "xINTERFACE_LIBRARY")
-      get_target_property(_target_link_libraries ${target} LINK_LIBRARIES)
-      if(_target_link_libraries)
-        foreach(_lib ${_target_link_libraries})
-          cuda_rdc_strip_alias(_lib ${_lib})
-          if(TARGET ${_lib})
-            cuda_rdc_get_library_middle_target(_libmid ${_lib})
-          endif()
-          if(TARGET ${_libmid})
-            list(APPEND ${outlist} ${_libmid})
-          endif()
-          # and recurse
-          cuda_rdc_cuda_gather_dependencies(_midlist ${_lib})
-          list(APPEND ${outlist} ${_midlist})
-        endforeach()
-      endif()
-    endif()
-    list(REMOVE_DUPLICATES ${outlist})
-    set(${outlist} ${${outlist}} PARENT_SCOPE)
+  if(NOT TARGET ${target})
+    return()
   endif()
+  cuda_rdc_strip_alias(target ${target})
+  get_target_property(_target_type ${target} TYPE)
+  if(NOT "x${_target_type}" STREQUAL "xINTERFACE_LIBRARY")
+    get_target_property(_target_link_libraries ${target} LINK_LIBRARIES)
+    if(_target_link_libraries)
+      foreach(_lib ${_target_link_libraries})
+        cuda_rdc_strip_alias(_lib ${_lib})
+        if(TARGET ${_lib})
+          cuda_rdc_get_library_middle_target(_libmid ${_lib})
+        endif()
+        if(TARGET ${_libmid})
+          list(APPEND ${outlist} ${_libmid})
+        endif()
+        # and recurse
+        cuda_rdc_cuda_gather_dependencies(_midlist ${_lib})
+        list(APPEND ${outlist} ${_midlist})
+      endforeach()
+    endif()
+  endif()
+  list(REMOVE_DUPLICATES ${outlist})
+  set(${outlist} ${${outlist}} PARENT_SCOPE)
 endfunction()
-
 
 #-----------------------------------------------------------------------------#
