@@ -239,8 +239,6 @@ function(cuda_rdc_add_library target)
 
   CUDA_GET_SOURCES_AND_OPTIONS(_sources _cmake_options _options ${ARGN})
 
-  set(_midsuf "")
-  set(_staticsuf "_static")
   cuda_rdc_sources_contains_cuda(_cuda_sources ${_sources})
 
   # Whether we need the special code or not is actually dependent on information
@@ -265,12 +263,12 @@ function(cuda_rdc_add_library target)
   )
   set(_lib_requested_type "SHARED")
   set(_cudaruntime_requested_type "Shared")
-  set(__static_build FALSE)
-  if((NOT BUILD_SHARED_LIBS AND NOT _ADDLIB_PARSE_SHARED) OR _ADDLIB_PARSE_STATIC)
+  set(_staticsuf "_static")
+  if((NOT BUILD_SHARED_LIBS AND NOT _ADDLIB_PARSE_SHARED)
+      OR _ADDLIB_PARSE_STATIC)
     set(_lib_requested_type "STATIC")
     set(_cudaruntime_requested_type "Static")
-    set(_staticsuf "${_midsuf}")
-    set(__static_build TRUE)
+    set(_staticsuf "")
   endif()
   if(_ADDLIB_PARSE_MODULE)
     message(FATAL_ERROR "cuda_rdc_add_library does not support MODULE library containing device code")
@@ -278,86 +276,82 @@ function(cuda_rdc_add_library target)
   if(_ADDLIB_PARSE_OBJECT)
     message(FATAL_ERROR "cuda_rdc_add_library does not support OBJECT library")
   endif()
-  add_library(${target}${_midsuf} ${_lib_requested_type} $<TARGET_OBJECTS:${target}_objects>)
+
+  ## OBJECTS ##
+
+  add_library(${target}_objects OBJECT ${_ADDLIB_PARSE_UNPARSED_ARGUMENTS})
+  set(_object_props
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RUNTIME_LIBRARY ${_cudaruntime_requested_type}
+  )
+  if("x${_lib_requested_type}" STREQUAL "xSHARED")
+    list(APPEND _object_props
+      POSITION_INDEPENDENT_CODE ON
+    )
+  endif()
+  set_target_properties(${target}_objects PROPERTIES ${_object_props})
+
+  ## MIDDLE (main library) ##
+
+  add_library(${target} ${_lib_requested_type}
+    $<TARGET_OBJECTS:${target}_objects>
+  )
+  set(_common_props
+    ${_object_props}
+    LINKER_LANGUAGE CUDA
+    CUDA_RDC_FINAL_LIBRARY ${target}_final
+    CUDA_RDC_MIDDLE_LIBRARY ${target}
+    CUDA_RDC_STATIC_LIBRARY ${target}${_staticsuf}
+    CUDA_RDC_OBJECT_LIBRARY ${target}_objects
+  )
+  set_target_properties(${target} PROPERTIES
+    ${_common_props}
+    CUDA_RDC_LIBRARY_TYPE Shared
+    CUDA_RESOLVE_DEVICE_SYMBOLS OFF # We really don't want nvlink called.
+    EXPORT_PROPERTIES "CUDA_RDC_LIBRARY_TYPE;CUDA_RDC_FINAL_LIBRARY;CUDA_RDC_MIDDLE_LIBRARY;CUDA_RDC_STATIC_LIBRARY"
+  )
+
+  ## STATIC ##
+
+  if(_staticsuf)
+    add_library(${target}${_staticsuf} STATIC
+      $<TARGET_OBJECTS:${target}_objects>
+    )
+    set_target_properties(${target}${_staticsuf} PROPERTIES
+      ${_common_props}
+      CUDA_RDC_LIBRARY_TYPE Static
+      EXPORT_PROPERTIES "CUDA_RDC_LIBRARY_TYPE;CUDA_RDC_FINAL_LIBRARY;CUDA_RDC_MIDDLE_LIBRARY;CUDA_RDC_STATIC_LIBRARY"
+    )
+  endif()
+
+  ## FINAL (dlink) ##
+
   # We need to use a dummy file as a library (per cmake) needs to contains
   # at least one source file.  The real content of the library will be
   # the cmake_device_link.o resulting from the execution of `nvcc -dlink`
   # Also non-cuda related test, for example `gtest_detail_Macros`,
   # will need to be linked again libcuda_rdc_final while a library
-  # that the detends on and that uses Celeritas::Core (for example
-  # libCeleritasTest.so) will need to be linked against `libcuda_rdc${_midsuf}`.
-  # If both the `${_midsuf}` and `_final` contains the `.o` files we would
-  # then have duplicated symbols (Here the symptoms will a crash
-  # during the cuda library initialization rather than a link error).
+  # that the depends on and that uses Celeritas::Core (for example
+  # libCeleritasTest.so) will need to be linked against `libceleritas`.
+  # If both the middle and `_final` contains the `.o` files we would
+  # then have duplicated symbols .  If both the middle and `_final`
+  # library contained the result of `nvcc -dlink` then we would get
+  # conflicting but duplicated *weak* symbols and here the symptoms
+  # will be a crash during the cuda library initialization or a failure to
+  # launch some kernels rather than a link error.
   cuda_rdc_generate_empty_cu_file(_emptyfilename ${target})
-  add_library(${target}_final ${_lib_requested_type}  ${_emptyfilename} )
-
-  set_target_properties(${target}_objects PROPERTIES
-    # This probably should be left to the user to set.
-    # In cuda_rdc this is needed for the shared build
-    # and for the static build with ROOT enabled.
-    POSITION_INDEPENDENT_CODE ON
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_RUNTIME_LIBRARY ${_cudaruntime_requested_type}
-  )
-
-  set_target_properties(${target}${_midsuf} PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_RUNTIME_LIBRARY ${_cudaruntime_requested_type}
-    CUDA_RESOLVE_DEVICE_SYMBOLS OFF # We really don't want nvlink called.
-    CUDA_RDC_LIBRARY_TYPE Shared
-    CUDA_RDC_FINAL_LIBRARY ${target}_final
-    CUDA_RDC_MIDDLE_LIBRARY ${target}${_midsuf}
-    CUDA_RDC_STATIC_LIBRARY ${target}${_staticsuf}
-    CUDA_RDC_OBJECT_LIBRARY ${target}_objects
-    EXPORT_PROPERTIES "CUDA_RDC_LIBRARY_TYPE;CUDA_RDC_FINAL_LIBRARY;CUDA_RDC_MIDDLE_LIBRARY;CUDA_RDC_STATIC_LIBRARY"
-  )
-
-  if(NOT _static_build)
-    set_target_properties(${target}${_staticsuf} PROPERTIES
-      LINKER_LANGUAGE CUDA
-      CUDA_SEPARABLE_COMPILATION ON
-      CUDA_RUNTIME_LIBRARY ${_cudaruntime_requested_type}
-      # CUDA_RESOLVE_DEVICE_SYMBOLS OFF # Default for static library
-      CUDA_RDC_LIBRARY_TYPE Static
-      CUDA_RDC_FINAL_LIBRARY ${target}_final
-      CUDA_RDC_MIDDLE_LIBRARY ${target}${_midsuf}
-      CUDA_RDC_STATIC_LIBRARY ${target}${_staticsuf}
-      CUDA_RDC_OBJECT_LIBRARY ${target}_objects
-      EXPORT_PROPERTIES "CUDA_RDC_LIBRARY_TYPE;CUDA_RDC_FINAL_LIBRARY;CUDA_RDC_MIDDLE_LIBRARY;CUDA_RDC_STATIC_LIBRARY"
-    )
-  endif()
-
+  add_library(${target}_final ${_lib_requested_type} ${_emptyfilename})
   set_target_properties(${target}_final PROPERTIES
-    LINKER_LANGUAGE CUDA
-    CUDA_RESOLVE_DEVICE_SYMBOLS ON
-    CUDA_SEPARABLE_COMPILATION ON
-    CUDA_RUNTIME_LIBRARY ${_cudaruntime_requested_type}
-    # CUDA_RESOLVE_DEVICE_SYMBOLS ON # Default for shared library
+    ${_common_props}
     CUDA_RDC_LIBRARY_TYPE Final
-    CUDA_RDC_FINAL_LIBRARY ${target}_final
-    CUDA_RDC_STATIC_LIBRARY ${target}${_staticsuf}
-    CUDA_RDC_MIDDLE_LIBRARY ${target}${_midsuf}
-    CUDA_RDC_OBJECT_LIBRARY ${target}_objects
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
     EXPORT_PROPERTIES "CUDA_RDC_LIBRARY_TYPE;CUDA_RDC_FINAL_LIBRARY;CUDA_RDC_MIDDLE_LIBRARY;CUDA_RDC_STATIC_LIBRARY"
   )
-
-  target_link_libraries(${target}_final
-    PUBLIC ${target}${_midsuf}
-  )
-
+  target_link_libraries(${target}_final PUBLIC ${target})
   target_link_options(${target}_final
-    PRIVATE
-    $<DEVICE_LINK:$<TARGET_FILE:${target}${_staticsuf}>>
+    PRIVATE $<DEVICE_LINK:$<TARGET_FILE:${target}${_staticsuf}>>
   )
-
-  add_dependencies(${target}_final ${target}${_midsuf})
   add_dependencies(${target}_final ${target}${_staticsuf})
-
-  if(_midsuf)
-    add_library(${target} ALIAS ${target}${_midsuf})
-  endif()
 endfunction()
 
 # Replacement for target_include_directories that is aware of
