@@ -258,7 +258,7 @@ function(cuda_rdc_add_library target)
   endif()
 
   cmake_parse_arguments(_ADDLIB_PARSE
-    "STATIC;SHARED;MODULE"
+    "STATIC;SHARED;MODULE;OBJECT"
     ""
     ""
     ${ARGN}
@@ -272,13 +272,11 @@ function(cuda_rdc_add_library target)
     set(_staticsuf "${_midsuf}")
     set(__static_build TRUE)
   endif()
-  if(_ADDLIB_PARSE_MODULE) # If we are here _contains_cuda is true
-    message(FATAL_ERROR "cuda_rdc_add_library does not support MODULE library containing CUDA code")
+  if(_ADDLIB_PARSE_MODULE)
+    message(FATAL_ERROR "cuda_rdc_add_library does not support MODULE library containing device code")
   endif()
-
-  add_library(${target}_objects OBJECT ${_ADDLIB_PARSE_UNPARSED_ARGUMENTS})
-  if(NOT __static_build)
-    add_library(${target}${_staticsuf} STATIC $<TARGET_OBJECTS:${target}_objects>)
+  if(_ADDLIB_PARSE_OBJECT)
+    message(FATAL_ERROR "cuda_rdc_add_library does not support OBJECT library")
   endif()
   add_library(${target}${_midsuf} ${_lib_requested_type} $<TARGET_OBJECTS:${target}_objects>)
   # We need to use a dummy file as a library (per cmake) needs to contains
