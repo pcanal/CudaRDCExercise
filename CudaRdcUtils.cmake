@@ -159,32 +159,31 @@ macro(CUDA_GET_SOURCES_AND_OPTIONS _sources _cmake_options _options)
   endforeach()
 endmacro()
 
+#-----------------------------------------------------------------------------#
 #
 # Internal routine to figure out if a list contains
-# CUDA source code.  Returns TRUE/FALSE in the OUTPUT_VARIABLE
+# CUDA source code.  Returns empty or the list of CUDA files in the var
 #
-function(cuda_rdc_sources_contains_cuda OUTPUT_VARIABLE)
-  set(_contains_cuda FALSE)
+function(cuda_rdc_sources_contains_cuda var)
+  set(_result)
   foreach(_source ${ARGN})
-    get_source_file_property(_iscudafile ${_source} LANGUAGE)
-    if(_iscudafile)
-      if ("x${_iscudafile}" STREQUAL "xCUDA")
-        set(_contains_cuda TRUE)
-      endif()
-    else()
+    get_source_file_property(_iscudafile "${_source}" LANGUAGE)
+    if ("x${_iscudafile}" STREQUAL "xCUDA")
+      list(APPEND _result "${_source}")
+    elseif(NOT _iscudafile)
       get_filename_component(_ext "${_source}" LAST_EXT)
       if("${_ext}" STREQUAL ".cu")
-        set(_contains_cuda TRUE)
-        break()
+        list(APPEND _result "${_source}")
       endif()
     endif()
   endforeach()
-  set(${OUTPUT_VARIABLE} ${_contains_cuda} PARENT_SCOPE)
+  set(${var} "${_result}" PARENT_SCOPE)
 endfunction()
 
+#-----------------------------------------------------------------------------#
 #
 # Internal routine to figure out if a target already contains
-# CUDA source code.  Returns TRUE/FALSE in the OUTPUT_VARIABLE
+# CUDA source code.  Returns empty or list of CUDA files in the OUTPUT_VARIABLE
 #
 function(cuda_rdc_lib_contains_cuda OUTPUT_VARIABLE target)
   cuda_rdc_strip_alias(target ${target})
@@ -201,6 +200,7 @@ function(cuda_rdc_lib_contains_cuda OUTPUT_VARIABLE target)
   endif()
 endfunction()
 
+#-----------------------------------------------------------------------------#
 #
 # Generate an empty .cu file to transform the library to a CUDA library
 #
@@ -240,7 +240,7 @@ function(cuda_rdc_add_library target)
 
   set(_midsuf "")
   set(_staticsuf "_static")
-  cuda_rdc_sources_contains_cuda(_contains_cuda ${_sources})
+  cuda_rdc_sources_contains_cuda(_cuda_sources ${_sources})
 
   # Whether we need the special code or not is actually dependent on information
   # we don't have ... yet
@@ -251,7 +251,7 @@ function(cuda_rdc_add_library target)
   # only in the case where they want the CUDA device code to be compiled
   # as "relocatable device code"
 
-  if(NOT CMAKE_CUDA_COMPILER OR NOT _contains_cuda)
+  if(NOT CMAKE_CUDA_COMPILER OR NOT _cuda_sources)
     add_library(${target} ${ARGN})
     return()
   endif()
