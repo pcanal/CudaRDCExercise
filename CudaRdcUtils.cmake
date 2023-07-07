@@ -212,21 +212,22 @@ function(cuda_rdc_generate_empty_cu_file emptyfilenamevar target)
   set(${emptyfilenamevar} ${_stub} PARENT_SCOPE)
 endfunction()
 
+#-----------------------------------------------------------------------------#
 #
 # Transfer the setting \${what} (both the PUBLIC and INTERFACE version) to from library \${fromlib} to the library \${tolib} that depends on it
-
+#
 function(cuda_rdc_transfer_setting fromlib tolib what)
   get_target_property(_temp ${fromlib} ${what})
-  if (_temp)
+  if(_temp)
     cmake_language(CALL target_${what} ${tolib} PUBLIC ${_temp})
   endif()
   get_target_property(_temp ${fromlib} INTERFACE_${what})
-  if (_temp)
+  if(_temp)
     cmake_language(CALL target_${what} ${tolib} PUBLIC ${_temp})
   endif()
 endfunction()
 
-#
+#-----------------------------------------------------------------------------#
 # cuda_rdc_add_library
 #
 # Add a library taking into account whether it contains
@@ -398,29 +399,31 @@ endfunction()
 function(cuda_rdc_target_compile_options target)
   if(NOT CELERITAS_USE_CUDA)
     target_compile_options(${ARGV})
+    return()
+  endif()
+
+  cuda_rdc_strip_alias(target ${target})
+  cuda_rdc_lib_contains_cuda(_contains_cuda ${target})
+
+  if(_contains_cuda)
+    get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
+    if(_targettype)
+      get_target_property(_target_middle ${target} CUDA_RDC_MIDDLE_LIBRARY)
+      get_target_property(_target_object ${target} CUDA_RDC_OBJECT_LIBRARY)
+    endif()
+  endif()
+  if(_target_object)
+    target_compile_options(${_target_object} ${ARGN})
+  endif()
+  if(_target_middle)
+    cuda_rdc_strip_alias(_target_middle ${_target_middle})
+    target_compile_options(${_target_middle} ${ARGN})
   else()
-
-    cuda_rdc_strip_alias(target ${target})
-    cuda_rdc_lib_contains_cuda(_contains_cuda ${target})
-
-    if (_contains_cuda)
-      get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
-      if(_targettype)
-        get_target_property(_target_middle ${target} CUDA_RDC_MIDDLE_LIBRARY)
-        get_target_property(_target_object ${target} CUDA_RDC_OBJECT_LIBRARY)
-      endif()
-    endif()
-    if(_target_object)
-      target_compile_options(${_target_object} ${ARGN})
-    endif()
-    if(_target_middle)
-      target_compile_options(${_target_middle} ${ARGN})
-    else()
-      target_compile_options(${ARGV})
-    endif()
+    target_compile_options(${ARGV})
   endif()
 endfunction()
 
+#-----------------------------------------------------------------------------#
 #
 # Replacement for the install function that is aware of the 3 libraries
 # (static, middle, final) libraries needed for a separatable CUDA library
@@ -457,6 +460,7 @@ function(cuda_rdc_install subcommand firstarg)
   endforeach()
 endfunction()
 
+#-----------------------------------------------------------------------------#
 # Return TRUE if 'lib' depends/uses directly or indirectly the library `potentialdepend`
 function(cuda_rdc_depends_on OUTVARNAME lib potentialdepend)
   set(${OUTVARNAME} FALSE PARENT_SCOPE)
@@ -480,7 +484,7 @@ function(cuda_rdc_depends_on OUTVARNAME lib potentialdepend)
   endif()
 endfunction()
 
-
+#-----------------------------------------------------------------------------#
 # Return the 'real' target name whether the output is an alias or not.
 function(cuda_rdc_strip_alias OUTVAR target)
   if(TARGET ${target})
@@ -492,6 +496,7 @@ function(cuda_rdc_strip_alias OUTVAR target)
   set(${OUTVAR} ${target} PARENT_SCOPE)
 endfunction()
 
+#-----------------------------------------------------------------------------#
 # Return the middle/shared library of the target, if any.
 macro(cuda_rdc_get_library_middle_target outvar target)
   get_target_property(_target_type ${target} TYPE)
@@ -502,6 +507,7 @@ macro(cuda_rdc_get_library_middle_target outvar target)
   endif()
 endmacro()
 
+#-----------------------------------------------------------------------------#
 # Retrieve the "middle" library, i.e. given a target, the
 # target name to be used as input to the linker of dependent libraries.
 function(cuda_rdc_use_middle_lib_in_property target property)
@@ -527,6 +533,7 @@ function(cuda_rdc_use_middle_lib_in_property target property)
   endif()
 endfunction()
 
+#-----------------------------------------------------------------------------#
 # Return the most derived "separatable cuda" library the target depends on.
 # If two or more cuda library are independent, we return both and the calling executable
 # should be linked with nvcc -dlink.
@@ -585,7 +592,7 @@ endfunction()
 function(cuda_rdc_check_cuda_runtime OUTVAR library)
 
   get_target_property(_runtime_setting ${library} CUDA_RUNTIME_LIBRARY)
-  if (NOT _runtime_setting)
+  if(NOT _runtime_setting)
     # We could get more exact information by using:
     #  file(GET_RUNTIME_DEPENDENCIES LIBRARIES ${_lib_loc} UNRESOLVED_DEPENDENCIES_VAR _lib_dependcies)
     # but we get
@@ -597,7 +604,7 @@ function(cuda_rdc_check_cuda_runtime OUTVAR library)
     # case we probably need to 'error out'.
     get_target_property(_cuda_library_type ${library} CUDA_RDC_LIBRARY_TYPE)
     get_target_property(_cuda_find_library ${library} CUDA_RDC_FINAL_LIBRARY)
-    if ("${_cuda_library_type}" STREQUAL "Shared")
+    if("${_cuda_library_type}" STREQUAL "Shared")
       set_target_properties(${library} PROPERTIES CUDA_RUNTIME_LIBRARY "Shared")
       set(_runtime_setting "Shared")
     elseif(NOT _cuda_find_library)
@@ -613,6 +620,8 @@ function(cuda_rdc_check_cuda_runtime OUTVAR library)
   set(${OUTVAR} ${_runtime_setting} PARENT_SCOPE)
 endfunction()
 
+
+#-----------------------------------------------------------------------------#
 # Replacement for target_link_libraries that is aware of
 # the 3 libraries (static, middle, final) libraries needed
 # for a separatable CUDA library
