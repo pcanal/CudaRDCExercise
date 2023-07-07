@@ -377,6 +377,7 @@ function(cuda_rdc_target_include_directories target)
     target_include_directories(${_target_object} ${ARGN})
   endif()
   if(_target_middle)
+    cuda_rdc_strip_alias(_target_middle ${_target_middle})
     target_include_directories(${_target_middle} ${ARGN})
   else()
     target_include_directories(${ARGV})
@@ -638,6 +639,7 @@ function(cuda_rdc_target_link_libraries target)
   endif()
 
   # Set now to let target_link_libraries do the argument parsing
+  cuda_rdc_strip_alias(_target_middle ${_target_middle})
   target_link_libraries(${_target_middle} ${ARGN})
 
   cuda_rdc_use_middle_lib_in_property(${_target_middle} INTERFACE_LINK_LIBRARIES)
@@ -734,6 +736,7 @@ function(cuda_rdc_target_link_libraries target)
         endif()
         get_target_property(_libstatic ${_lib} CUDA_RDC_STATIC_LIBRARY)
         if(TARGET ${_libstatic})
+          cuda_rdc_strip_alias(_target_final ${_target_final})
           target_link_options(${_target_final}
             PRIVATE
             $<DEVICE_LINK:$<TARGET_FILE:${_libstatic}>>
