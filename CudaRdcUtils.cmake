@@ -348,6 +348,7 @@ function(cuda_rdc_add_library target)
   add_library(${target}_final ${_lib_requested_type} ${_emptyfilename})
   set_target_properties(${target}_final PROPERTIES
     ${_common_props}
+    LINK_DEPENDS $<TARGET_FILE:${target}${_staticsuf}>
     CUDA_RDC_LIBRARY_TYPE Final
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
     EXPORT_PROPERTIES "CUDA_RDC_LIBRARY_TYPE;CUDA_RDC_FINAL_LIBRARY;CUDA_RDC_MIDDLE_LIBRARY;CUDA_RDC_STATIC_LIBRARY"
