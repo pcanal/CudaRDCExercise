@@ -546,9 +546,6 @@ function(cuda_rdc_find_final_library OUTLIST flat_dependency_list)
     else()
       set(_newresult "")
       foreach(_reslib ${_result})
-        cuda_rdc_depends_on(_depends_on ${_lib} ${_reslib})
-        cuda_rdc_depends_on(_depends_on ${_reslib} ${_lib})
-
         cuda_rdc_depends_on(_depends_on ${_reslib} ${_lib})
         if(${_depends_on})
           # The library in the result depends/uses the library we are looking at,
