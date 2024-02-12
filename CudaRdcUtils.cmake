@@ -17,7 +17,7 @@ relocatable device code and most importantly linking against those libraries.
 
   ::
 
-    cuda_rdc_add_library(<name> [STATIC | SHARED | MODULE]
+    cuda_rdc_add_library(<name> [STATIC | SHARED | MODULE | ALIAS]
             [EXCLUDE_FROM_ALL]
             [<source>...])
 
@@ -238,6 +238,36 @@ endfunction()
 function(cuda_rdc_add_library target)
 
   cuda_get_sources_and_options(_sources _cmake_options _options ${ARGN})
+
+  if (_cmake_options STREQUAL "ALIAS")
+    if (ARGC != 3)
+      # Not sure what this syntax is ... pass the buck
+      add_library(${target} ${ARGN})
+      return()
+    endif()
+    # The aliased name must not be an alias, so no need to strip set
+    set(alias_target ${_sources})
+    get_target_property(_targettype ${alias_target} CUDA_RDC_LIBRARY_TYPE)
+
+    string(REGEX MATCH ".*::" _scopename ${target})
+
+    if(NOT _targettype OR NOT _scopename)
+      # Not sure what this syntax is ... pass the buck
+      add_library(${target} ${ARGN})
+      return()
+    endif()
+
+    string(REGEX REPLACE "::$" "" _scopename ${_scopename})
+
+    # No alias setup for the object library which are not exported.
+    foreach(_type "FINAL" "MIDDLE" "STATIC")
+      get_target_property(_lib ${alias_target} "CUDA_RDC_${_type}_LIBRARY")
+      if(_lib)
+        cuda_rdc_strip_alias(_lib ${_lib})
+        add_library("${_scopename}::${_lib)" ALIAS  ${_targetlib})
+      endif()
+    endforeach()
+  endif()
 
   cuda_rdc_sources_contains_cuda(_cuda_sources ${_sources})
 
