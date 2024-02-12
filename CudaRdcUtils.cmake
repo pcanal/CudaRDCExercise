@@ -101,6 +101,20 @@ relocatable device code and most importantly linking against those libraries.
 
   See ``target_compile_options`` for additional detail.
 
+.. command:: cuda_rdc_set_target_properties
+
+    Set the targets properties.
+
+     ::
+       cuda_rdc_set_target_properties(<targets> ...
+                      PROPERTIES <prop1> <value1>
+                      [<prop2> <value2>] ...)
+
+  In the case that an input target does not contain CUDA code, the command decays
+  to ``set_target_properties``.
+
+  See ``set_target_properties`` for additional detail.
+
 #]=======================================================================]
 
 include_guard(GLOBAL)
@@ -158,6 +172,29 @@ macro(cuda_get_sources_and_options _sources _cmake_options _options)
     endif()
   endforeach()
 endmacro()
+
+
+#-----------------------------------------------------------------------------#
+# cuda_rdc_set_properties
+#
+# Set the property on a library and all its Cuda RDC support libraries.
+#
+function(cuda_rdc_set_target_properties target)
+  cuda_rdc_strip_alias(target ${target})
+  get_target_property(_targettype ${target} CUDA_RDC_LIBRARY_TYPE)
+  if (NOT _targettype)
+    set_target_properties(${target} ${ARGN})
+    return()
+  endif()
+  foreach(_type "FINAL" "MIDDLE" "STATIC" "OBJECT")
+    get_target_property(_lib ${target} "CUDA_RDC_${_type}_LIBRARY")
+    if(_lib)
+      cuda_rdc_strip_alias(_lib ${_lib})
+      set_target_properties(${_lib} ${ARGN})
+    endif()
+  endforeach()
+endfunction()
+
 
 #-----------------------------------------------------------------------------#
 #
