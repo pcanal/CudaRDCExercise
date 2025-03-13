@@ -1,6 +1,26 @@
-# CUDA RDC Test
+# CUDA RDC CMake script
 
-Noddy exercise of the CudaRDCUtil module to confirm/document behaviour and
+CMake utility functions for building and linking libraries containing CUDA
+relocatable device code and most importantly linking against those libraries.
+
+The main CMake function to use are:
+- cuda_rdc_add_library
+- cuda_rdc_target_link_libraries
+- cuda_rdc_target_include_directories
+- cuda_rdc_install
+- cuda_rdc_target_compile_options
+- cuda_rdc_set_target_properties
+
+Those functions handle the complexity of compiling and mixing shared libraries
+that contains CUDA relocatable device.  The major limitation of the CUDA
+relocatable device is it requires that an executable the result of exactly
+one nvlink invocation to which is passed all the content of all the shared
+libraries that contains CUDA relocatable code and that are used by that
+executable.
+
+## Testing
+
+This repositoru includes exercise of the CudaRdcUtil module to confirm/document behaviour and
 requirements for building/consuming libraries built this way.
 
 It just needs CMake 3.18 or newer, C++ and CUDA compilers (tested with CMake
